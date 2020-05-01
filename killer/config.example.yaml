@@ -1,0 +1,14 @@
+console: false
+mysql:
+  username: "root"
+  password: "123"
+  network: tcp
+  server: 127.0.0.1
+  port: 3306
+  database: mark
+alibucket:
+  endpoint: http://oss-cn-beijing.aliyuncs.com
+  accessKeyId:
+  accessKeySecret:
+  bucketName:
+  style: image/resize,w_1024
