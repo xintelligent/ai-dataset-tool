@@ -47,9 +47,8 @@ func writeCsvLabelsFile() {
 		subIndex := strings.LastIndex(value.Image_path, "/")
 		// fullFileIndex := strings.LastIndex(value.Image_path, ".")
 		if NeedDownloadImageFile {
-			var file = downloadFile{objectName: value.Image_path, downloadedFileName: ImageOutPath + "/" + value.Image_path[subIndex+1:]}
 			DownloadPoolIns.goroutine_cnt <- 1
-			go DownloadPoolIns.DGoroutine(file)
+			go DownloadPoolIns.DGoroutine(transformFile(value.Image_path))
 		}
 		var bili float64
 		if labelData.ImageWidth > 1024 {

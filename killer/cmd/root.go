@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/jmoiron/sqlx"
 	"os"
 	"path/filepath"
 
@@ -10,10 +11,15 @@ import (
 	"github.com/spf13/viper"
 )
 
+var Db *sqlx.DB
+
 var Log = logrus.New()
 var RootCmd = &cobra.Command{
 	Use:   "killer",
 	Short: "killer root",
+	Run: func(c *cobra.Command, args []string) {
+
+	},
 }
 
 func Exec() {
@@ -31,6 +37,13 @@ func Exec() {
 		versionCmd,
 		translate,
 	)
+	dsn := fmt.Sprintf("%s:%s@%s(%s:%d)/%s", viper.GetString("mysql.username"), viper.GetString("mysql.password"), viper.GetString("mysql.network"), viper.GetString("mysql.server"), viper.GetInt("mysql.port"), viper.GetString("mysql.database"))
+	DB, err := sqlx.Open("mysql", dsn)
+	if err != nil {
+		Log.Printf("Open mysql failed,err:%v\n", err)
+		return
+	}
+	Db = DB
 	RootCmd.Execute()
 }
 func init() {

@@ -26,7 +26,8 @@ type shape struct {
 }
 
 func getLabelsFromMysql(pid string) {
-	err := Db.Select(&labels, "select `id`, `project_id`, `image_path`, `data`, `user_id` from labels where project_id="+pid)
+	//err := Db.Select(&labels, "select `id`, `project_id`, `image_path`, `data`, `user_id` from labels where project_id="+pid)
+	err := Db.Select(&labels, "SELECT `id`, `project_id`, `image_path`, `data`, `user_id` FROM labels WHERE image_path regexp '/(12|13|15|19|21|23|33|34|38|39|72)/' AND project_id=13")
 	if err != nil {
 		panic(fmt.Errorf("mysql get labels err: %s \n", err))
 	}

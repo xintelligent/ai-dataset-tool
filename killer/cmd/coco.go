@@ -111,11 +111,9 @@ func setCoco() {
 		if err != nil {
 			fmt.Println("Unmarshal err", err)
 		}
-		subIndex := strings.LastIndex(value.Image_path, "/")
 		if NeedDownloadImageFile {
-			var file = downloadFile{objectName: value.Image_path, downloadedFileName: ImageOutPath + "/" + value.Image_path[subIndex+1:]}
 			DownloadPoolIns.goroutine_cnt <- 1
-			go DownloadPoolIns.DGoroutine(file)
+			go DownloadPoolIns.DGoroutine(transformFile(value.Image_path))
 		}
 		setImages(&images, &value, &labelData)
 		var bili float64

@@ -5,12 +5,9 @@ import (
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
 	"os"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
-
-var Db *sqlx.DB
 
 var Format string
 var AnnotationOutPath string
@@ -22,9 +19,13 @@ var translate = &cobra.Command{
 	Use: "translate",
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) != 1 {
+			fmt.Println("缺少项目id")
 			Log.Println("缺少项目id")
 			os.Exit(1)
 		}
+
+		getClassesFromMysql(args[0])
+		getLabelsFromMysql(args[0])
 		os.MkdirAll(AnnotationOutPath, 0777)
 		os.MkdirAll(ImageOutPath, 0777)
 		if NeedDownloadImageFile {
@@ -40,26 +41,18 @@ var translate = &cobra.Command{
 		if berr != nil {
 			Log.Println(berr)
 		}
-		baseOnFormat(args[0])
+		baseOnFormat()
 	},
 }
 
 func init() {
-	translate.Flags().StringVarP(&Format, "Format", "f", "csv", "Format(csv or coco)")
+	translate.Flags().StringVarP(&Format, "Format", "f", "csv", "Format(csv or coco or voc)")
 	translate.Flags().StringVarP(&AnnotationOutPath, "AnnotationOutPath", "a", "./data", "label file out path")
 	translate.Flags().StringVarP(&ImageOutPath, "imageOutPath", "i", "./images", "images file out path")
 	translate.Flags().BoolVarP(&NeedDownloadImageFile, "needDownloadImageFile", "n", false, "need download image file")
-	dsn := fmt.Sprintf("%s:%s@%s(%s:%d)/%s", viper.GetString("mysql.username"), viper.GetString("mysql.password"), viper.GetString("mysql.network"), viper.GetString("mysql.server"), viper.GetInt("mysql.port"), viper.GetString("mysql.database"))
-	DB, err := sqlx.Open("mysql", dsn)
-	if err != nil {
-		Log.Printf("Open mysql failed,err:%v\n", err)
-		return
-	}
-	Db = DB
 }
-func baseOnFormat(pid string) {
-	getClassesFromMysql(pid)
-	getLabelsFromMysql(pid)
+func baseOnFormat() {
+
 	switch Format {
 	case "csv":
 		writeCsvClassFile()
@@ -67,7 +60,6 @@ func baseOnFormat(pid string) {
 	case "coco":
 		WriteCocoFile()
 	case "voc":
-		writeVocLabelsFile()
 		writeVocLabelsFile()
 	}
 }
