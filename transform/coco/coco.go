@@ -1,6 +1,8 @@
-package cmd
+package coco
 
 import (
+	"ai-dataset-tool/sql"
+	"ai-dataset-tool/utils"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -69,7 +71,7 @@ var CocoData Coco
 
 func WriteCocoFile() error {
 	setCoco()
-	file, err := os.Create(AnnotationOutPath + "/coco.json")
+	file, err := os.Create(utils.DownloadIns.AnnotationOutPath + "/coco.json")
 	if err != nil {
 		fmt.Println("创建文件失败:", err)
 		return err
@@ -84,7 +86,7 @@ func WriteCocoFile() error {
 	return nil
 }
 func setCategories(c *[]Category) {
-	for _, v := range classes {
+	for _, v := range sql.Classes {
 		category := Category{
 			Id:            v.Index,
 			Name:          v.Name,
@@ -105,15 +107,15 @@ func setCoco() {
 	var images []Image
 	var annotations []Annotation
 
-	labelData := data{}
-	for _, value := range labels {
+	labelData := sql.Data{}
+	for _, value := range sql.Labels {
 		err := json.Unmarshal([]byte(value.Data), &labelData)
 		if err != nil {
 			fmt.Println("Unmarshal err", err)
 		}
-		if NeedDownloadImageFile {
-			DownloadPoolIns.goroutine_cnt <- 1
-			go DownloadPoolIns.DGoroutine(transformFile(value.Image_path))
+		if utils.DownloadIns.NeedDownloadImageFile {
+			utils.DownloadIns.Goroutine_cnt <- 1
+			go utils.DownloadIns.DGoroutine(utils.TransformFile(value.Image_path))
 		}
 		setImages(&images, &value, &labelData)
 		var bili float64
@@ -130,7 +132,7 @@ func setCoco() {
 	CocoData.Annotations = annotations
 	CocoData.Categories = categories
 }
-func setImages(i *[]Image, l *lab, ld *data) {
+func setImages(i *[]Image, l *sql.Lab, ld *sql.Data) {
 	subIndex := strings.LastIndex(l.Image_path, "/")
 	image := Image{
 		Id:            l.Id,
@@ -144,16 +146,16 @@ func setImages(i *[]Image, l *lab, ld *data) {
 	}
 	*i = append(*i, image)
 }
-func setAnnotation(an *[]Annotation, ld *data, id int, imageId int, bili float64) {
+func setAnnotation(an *[]Annotation, ld *sql.Data, id int, imageId int, bili float64) {
 	for _, v := range ld.Label {
 		cid, err := strconv.Atoi(v.Category)
 		if err != nil {
 			fmt.Println(err)
 		}
-		xmin := math.Floor(toFloat64(v.Xmin)*bili + 0.5)
-		ymin := math.Floor(toFloat64(v.Ymin)*bili + 0.5)
-		xmax := math.Floor(toFloat64(v.Xmax)*bili + 0.5)
-		ymax := math.Floor(toFloat64(v.Ymax)*bili + 0.5)
+		xmin := math.Floor(utils.ToFloat64(v.Xmin)*bili + 0.5)
+		ymin := math.Floor(utils.ToFloat64(v.Ymin)*bili + 0.5)
+		xmax := math.Floor(utils.ToFloat64(v.Xmax)*bili + 0.5)
+		ymax := math.Floor(utils.ToFloat64(v.Ymax)*bili + 0.5)
 		annotation := Annotation{
 			Id:           id,
 			Image_id:     imageId,

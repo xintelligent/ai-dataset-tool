@@ -1,7 +1,7 @@
 package main
 
 import (
-	"studygo/killer/cmd"
+	"ai-dataset-tool/cmd"
 )
 
 func main() {

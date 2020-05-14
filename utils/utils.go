@@ -1,6 +1,7 @@
-package cmd
+package utils
 
 import (
+	"ai-dataset-tool/sql"
 	"bufio"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
@@ -9,13 +10,13 @@ import (
 	"strconv"
 )
 
-func getCategoryName(cn string) string {
+func GetCategoryName(cn string, c *[]sql.ClassName) string {
 	cnint, err := strconv.ParseInt(cn, 10, 64)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	for _, v := range classes {
+	for _, v := range *c {
 		if v.Index == int(cnint) {
 			return v.Name
 		}
@@ -38,7 +39,7 @@ func WriteFile(c string, f *os.File) error {
 }
 
 // ----------------------tool private-----
-func pxToString(a interface{}) string {
+func PxToString(a interface{}) string {
 	if v, p := a.(int); p {
 		return strconv.Itoa(v)
 	}
@@ -59,7 +60,7 @@ func pxToString(a interface{}) string {
 	}
 	return ""
 }
-func toFloat64(unk interface{}) float64 {
+func ToFloat64(unk interface{}) float64 {
 	switch i := unk.(type) {
 	case float64:
 		return i
