@@ -27,7 +27,7 @@ type Annotation struct {
 type source struct {
 	Database   string `xml:"database"`
 	Annotation string `xml:"annotation"`
-	Image      string `xml:"image"`
+	Image      string `xml:"imageTool"`
 	Flickrid   int    `xml:"flickrid"`
 }
 type owner struct {

@@ -11,7 +11,7 @@ alibucket:
   accessKeyId:
   accessKeySecret:
   bucketName:
-  style: image/resize,w_1024
+  style: imageTool/resize,w_1024
   imageWidth: 1024
     imageHeight: 1024
 dataset:

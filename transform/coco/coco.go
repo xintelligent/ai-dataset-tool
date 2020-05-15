@@ -14,7 +14,7 @@ import (
 
 type Coco struct {
 	Info        Info         `json:"info"`
-	Image       []Image      `json:"image"`
+	Image       []Image      `json:"imageTool"`
 	Annotations []Annotation `json:"annotations"`
 	Categories  []Category   `json:"categories"`
 }

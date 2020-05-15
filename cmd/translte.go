@@ -39,9 +39,9 @@ var translateCmd = &cobra.Command{
 
 func init() {
 	translateCmd.Flags().StringVarP(&format, "Format", "f", "csv", "Format(csv or coco or voc)")
-	translateCmd.Flags().StringVarP(&utils.DownloadIns.AnnotationOutPath, "AnnotationOutPath", "a", "./data", "label file out path")
-	translateCmd.Flags().StringVarP(&utils.DownloadIns.ImageOutPath, "imageOutPath", "i", "./images", "images file out path")
-	translateCmd.Flags().BoolVarP(&utils.DownloadIns.NeedDownloadImageFile, "needDownloadImageFile", "n", false, "need download image file")
+	//translateCmd.Flags().StringVarP(&utils.DownloadIns.AnnotationOutPath, "AnnotationOutPath", "a", "./data", "label file out path")
+	//translateCmd.Flags().StringVarP(&utils.DownloadIns.ImageOutPath, "imageOutPath", "i", "./images", "images file out path")
+	//translateCmd.Flags().BoolVarP(&utils.DownloadIns.NeedDownloadImageFile, "needDownloadImageFile", "n", false, "need download imageTool file")
 }
 func baseOnFormat() {
 	switch format {
