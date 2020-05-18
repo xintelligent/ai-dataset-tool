@@ -11,7 +11,7 @@ var fileName string
 var makeClassCmd = &cobra.Command{
 	Use: "makeClass",
 	Run: func(c *cobra.Command, args []string) {
-		sql.GetClassesFromMysql(pid)
+		sql.GetClassesFromMysql()
 		//if len(sql.Classes) == 0 {
 		//	panic("没有数据")
 		//}

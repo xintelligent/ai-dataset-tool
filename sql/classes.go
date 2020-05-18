@@ -14,7 +14,7 @@ type ClassName struct {
 	Name  string `json:"name"`
 }
 
-func GetClassesFromMysql(pid string) {
+func GetClassesFromMysql() {
 	err := Db.Select(&Classes, viper.GetString("dataset.classSql"))
 	if err != nil {
 		panic(fmt.Errorf("mysql get classes err: %s \n", err))

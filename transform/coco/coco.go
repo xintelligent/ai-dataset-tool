@@ -5,10 +5,12 @@ import (
 	"ai-dataset-tool/utils"
 	"encoding/json"
 	"fmt"
+	"github.com/spf13/viper"
 	"math"
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -69,9 +71,9 @@ type Box struct {
 
 var CocoData Coco
 
-func WriteCocoFile() error {
-	setCoco()
-	file, err := os.Create(utils.DownloadIns.AnnotationOutPath + "/coco.json")
+func WriteCocoFile(annotationOutPath string, needDownloadImageFile bool) error {
+	setCoco(needDownloadImageFile)
+	file, err := os.Create(annotationOutPath + "/coco.json")
 	if err != nil {
 		fmt.Println("创建文件失败:", err)
 		return err
@@ -95,7 +97,7 @@ func setCategories(c *[]Category) {
 		*c = append(*c, category)
 	}
 }
-func setCoco() {
+func setCoco(needDownloadImageFile bool) {
 	CocoData.Info = Info{
 		Year:         time.Now().Year(),
 		Version:      "v1.0",
@@ -106,26 +108,27 @@ func setCoco() {
 	}
 	var images []Image
 	var annotations []Annotation
-
+	var wg sync.WaitGroup
 	labelData := sql.Data{}
 	for _, value := range sql.Labels {
 		err := json.Unmarshal([]byte(value.Data), &labelData)
 		if err != nil {
 			fmt.Println("Unmarshal err", err)
 		}
-		if utils.DownloadIns.NeedDownloadImageFile {
-			utils.DownloadIns.Goroutine_cnt <- 1
-			go utils.DownloadIns.DGoroutine(utils.TransformFile(value.Image_path))
-		}
+		utils.DownloadIns.Goroutine_cnt <- 1
+		go utils.DownloadIns.DGoroutine(&wg, utils.TransformFile(value.Image_path))
 		setImages(&images, &value, &labelData)
 		var bili float64
-		if labelData.ImageWidth > 1024 {
-			bili = float64(1024) / float64(labelData.ImageWidth)
+		configImageWidth := viper.GetInt("alibucket.imageWidth")
+		configImageHeight := viper.GetInt("alibucket.imageHeight")
+		if (labelData.ImageWidth > configImageWidth) || (labelData.ImageHeight > configImageHeight) {
+			bili = float64(configImageWidth) / float64(labelData.ImageWidth)
 		} else {
 			bili = 1
 		}
 		setAnnotation(&annotations, &labelData, value.Id, value.Id, bili)
 	}
+	wg.Wait()
 	var categories []Category
 	setCategories(&categories)
 	CocoData.Image = images

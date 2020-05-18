@@ -53,7 +53,7 @@ type Bndbox struct {
 	Ymax string `xml:"ymax"`
 }
 
-func WriteVocLabelsFile() {
+func WriteVocLabelsFile(annotationOutPath string, imageOutPath string) {
 	log.Klog.Printf("本次总图片数量：%d", len(sql.Labels))
 	var wg sync.WaitGroup
 	for _, value := range sql.Labels {
@@ -67,12 +67,12 @@ func WriteVocLabelsFile() {
 
 		utils.DownloadIns.Goroutine_cnt <- 1
 		wg.Add(1)
-		go utils.DownloadIns.DVGoroutine(&wg, df)
+		go utils.DownloadIns.DGoroutine(&wg, df)
 
 		var vocLabelsTrainFile *os.File // 训练集
 		// 构建xml数据
 		vocAnnotation := Annotation{
-			Folder:   utils.DownloadIns.ImageOutPath,
+			Folder:   imageOutPath,
 			Filename: df.Name,
 			Size: Size{
 				labelData.ImageWidth,
@@ -116,7 +116,7 @@ func WriteVocLabelsFile() {
 		}
 		defer vocLabelsTrainFile.Close()
 		// 一个图片文件
-		if vocLabelsTrainFile, err = os.OpenFile(utils.DownloadIns.AnnotationOutPath+"/"+df.Name+".xml", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0777); err != nil {
+		if vocLabelsTrainFile, err = os.OpenFile(annotationOutPath+"/"+df.Name+".xml", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0777); err != nil {
 			log.Klog.Println("文件操作err", err)
 			os.Exit(1)
 		}
@@ -127,10 +127,10 @@ func WriteVocLabelsFile() {
 		}
 	}
 	wg.Wait()
-	writeVocTraniAndTestFile()
+	writeVocTrainAndTestFile(annotationOutPath)
 }
 
-func writeVocTraniAndTestFile() {
+func writeVocTrainAndTestFile(annotationOutPath string) {
 	imageCount := utils.ToFloat64(len(sql.Labels))
 	testCount := math.Floor(imageCount*0.2 + 0.5)
 	rand.Seed(time.Now().Unix())
@@ -142,8 +142,8 @@ func writeVocTraniAndTestFile() {
 			break
 		}
 	}
-	writeTxt(&testSlice, "test.txt")
-	writeTxt(&sql.Labels, "trainval.txt")
+	writeTxt(&testSlice, annotationOutPath+"/test.txt")
+	writeTxt(&sql.Labels, annotationOutPath+"/trainval.txt")
 
 }
 
@@ -160,7 +160,7 @@ func writeTxt(l *[]sql.Lab, fileName string) {
 		lastIndex := strings.LastIndex(v.Image_path, ".")
 		fileContext += v.Image_path[firstIndex+1:lastIndex] + "\n"
 	}
-	if file, err := os.OpenFile(utils.DownloadIns.AnnotationOutPath+"/"+fileName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0777); err == nil {
+	if file, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0777); err == nil {
 		err := utils.WriteFile(fileContext, file)
 		if err != nil {
 			log.Klog.Errorln("标签文件写入失败")

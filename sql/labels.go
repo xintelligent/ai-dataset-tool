@@ -28,7 +28,7 @@ type Shape struct {
 	Category string      `json:"category"`
 }
 
-func GetLabelsFromMysql(pid string) {
+func GetLabelsFromMysql() {
 	err := Db.Select(&Labels, viper.GetString("dataset.labelSql"))
 	//err := cmd.Db.Select(&labels, "SELECT `id`, `project_id`, `image_path`, `data`, `user_id` FROM labels WHERE image_path regexp '/(12|13|15|19|21|23|33|34|38|39|72)/' AND project_id=13")
 	if err != nil {

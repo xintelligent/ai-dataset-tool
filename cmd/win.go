@@ -1,6 +1,8 @@
 package cmd
 
-import "math"
+import (
+	"math"
+)
 
 // 标签列表，从标签集合对象复制，
 // 按照裁剪目标，初始化原图像，后分割图像
@@ -18,7 +20,9 @@ type labelRect struct {
 	Category int
 }
 
-var labelGroup []labelMember
+type labelGroup struct {
+	labelMembers []labelMember
+}
 
 type labelMember struct {
 	splitIndex int
@@ -35,4 +39,8 @@ func NewImage(width int, height int, splitSize int) (i *imageObject) {
 	i.width = int(math.Ceil(float64(width)/float64(splitSize))) * splitSize
 	i.height = int(math.Ceil(float64(height)/float64(splitSize))) * splitSize
 	return
+}
+
+func (lg *labelGroup) set(ss int) {
+
 }
