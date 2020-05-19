@@ -18,3 +18,4 @@ alibucket:
 dataset:
   labelSql: ""
   classSql: ""
+  splitImageOutPath: split
