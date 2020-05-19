@@ -1,19 +1,17 @@
 package sql
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/spf13/viper"
 )
 
-// 标签数据
-var Labels []Lab
-
 type Lab struct {
-	Id         int    `json:"id"`
-	Project_id int    `json:"project_id"`
-	Image_path string `json:"image_path"`
-	Data       string `json:"data"`
-	User_id    int    `json:"user_id"`
+	Id         int    `db:"id"`
+	Project_id int    `db:"project_id"`
+	Image_path string `db:"image_path"`
+	Data       string `db:"data"`
+	User_id    int    `db:"user_id"`
 }
 type Data struct {
 	Label       []Shape `json:"label"`
@@ -28,10 +26,16 @@ type Shape struct {
 	Category string      `json:"category"`
 }
 
-func GetLabelsFromMysql() {
-	err := Db.Select(&Labels, viper.GetString("dataset.labelSql"))
+func NewLabelsFromMysql() (l []Lab, err error) {
+	err = Db.Select(&l, viper.GetString("dataset.labelSql"))
 	//err := cmd.Db.Select(&labels, "SELECT `id`, `project_id`, `image_path`, `data`, `user_id` FROM labels WHERE image_path regexp '/(12|13|15|19|21|23|33|34|38|39|72)/' AND project_id=13")
 	if err != nil {
 		panic(fmt.Errorf("mysql get labels err: %s \n", err))
 	}
+	return
+}
+
+func (l *Lab) JsonToStruct() (data Data, err error) {
+	err = json.Unmarshal([]byte(l.Data), &data)
+	return
 }

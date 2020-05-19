@@ -1,22 +1,16 @@
 package sql
 
 import (
-	"fmt"
 	"github.com/spf13/viper"
 )
 
-// 标签名称目录
-var Classes []ClassName
-
 type ClassName struct {
-	Id    int    `json:"id"`
-	Index int    `json:"index"`
-	Name  string `json:"name"`
+	Id    int
+	Index int
+	Name  string
 }
 
-func GetClassesFromMysql() {
-	err := Db.Select(&Classes, viper.GetString("dataset.classSql"))
-	if err != nil {
-		panic(fmt.Errorf("mysql get classes err: %s \n", err))
-	}
+func NewClassesFromMysql() (c []ClassName, err error) {
+	err = Db.Select(&c, viper.GetString("dataset.classSql"))
+	return
 }

@@ -4,7 +4,6 @@ import (
 	"ai-dataset-tool/log"
 	"ai-dataset-tool/sql"
 	"ai-dataset-tool/utils"
-	"encoding/json"
 	"encoding/xml"
 	"github.com/spf13/viper"
 	"math"
@@ -58,13 +57,15 @@ func WriteVocLabelsFile(annotationOutPath string, imageOutPath string) {
 	var wg sync.WaitGroup
 	for _, value := range sql.Labels {
 		df := utils.TransformFile(value.Image_path)
-		labelData := sql.Data{}
-		err := json.Unmarshal([]byte(value.Data), &labelData)
+		//labelData := sql.Data{}
+		//err := json.Unmarshal([]byte(value.Data), &labelData)
+		//if err != nil {
+		//	log.Klog.Println("Label data field Unmarshal err", err)
+		//}
+		labelData, err := value.JsonToStruct()
 		if err != nil {
 			log.Klog.Println("Label data field Unmarshal err", err)
 		}
-		log.Klog.Println(df.Name)
-
 		utils.DownloadIns.Goroutine_cnt <- 1
 		wg.Add(1)
 		go utils.DownloadIns.DGoroutine(&wg, df)

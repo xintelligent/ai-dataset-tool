@@ -2,13 +2,14 @@ package cmd
 
 import (
 	"ai-dataset-tool/sql"
+	"ai-dataset-tool/transform"
 	"ai-dataset-tool/transform/coco"
 	"ai-dataset-tool/transform/csv"
 	"ai-dataset-tool/transform/voc"
 	"ai-dataset-tool/utils"
-	"os"
-
+	"fmt"
 	"github.com/spf13/cobra"
+	"os"
 )
 
 var format string
@@ -16,8 +17,8 @@ var format string
 var translateCmd = &cobra.Command{
 	Use: "translate",
 	Run: func(cmd *cobra.Command, args []string) {
-		sql.GetClassesFromMysql()
-		sql.GetLabelsFromMysql()
+
+		fmt.Println(sql.Labels[0].Data)
 		os.MkdirAll(utils.AnnotationOutPath, 0777)
 		os.MkdirAll(utils.ImageOutPath, 0777)
 		utils.InitDownload()
@@ -29,9 +30,7 @@ var translateCmd = &cobra.Command{
 
 func init() {
 	translateCmd.Flags().StringVarP(&format, "Format", "f", "csv", "Format(csv or coco or voc)")
-	translateCmd.Flags().StringVarP(&utils.AnnotationOutPath, "AnnotationOutPath", "a", "./data", "label file out path")
-	translateCmd.Flags().StringVarP(&utils.ImageOutPath, "imageOutPath", "i", "./images", "images file out path")
-	translateCmd.Flags().BoolVarP(&utils.NeedDownloadImageFile, "needDownloadImageFile", "n", false, "need download imageTool file")
+
 	RootCmd.AddCommand(translateCmd)
 }
 func baseOnFormat() {
@@ -43,5 +42,7 @@ func baseOnFormat() {
 		coco.WriteCocoFile(utils.AnnotationOutPath, utils.NeedDownloadImageFile)
 	case "voc":
 		voc.WriteVocLabelsFile(utils.AnnotationOutPath, utils.ImageOutPath)
+	case "split":
+		transform.Test(utils.AnnotationOutPath, utils.ImageOutPath)
 	}
 }

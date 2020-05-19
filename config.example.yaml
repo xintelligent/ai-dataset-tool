@@ -1,4 +1,5 @@
 console: false
+concurrent: 10
 mysql:
   username: "root"
   password: "123"

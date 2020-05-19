@@ -2,6 +2,7 @@ package utils
 
 import (
 	"ai-dataset-tool/log"
+	"github.com/spf13/viper"
 	"math/rand"
 	"os"
 	"strings"
@@ -12,9 +13,8 @@ import (
 var r *rand.Rand
 var DownloadIns *Download
 var (
-	AnnotationOutPath     string
-	NeedDownloadImageFile bool
-	ImageOutPath          string
+	AnnotationOutPath string
+	ImageOutPath      string
 )
 
 type Download struct {
@@ -39,16 +39,17 @@ func TransformFile(path string) DownloadFile {
 
 func InitDownload() {
 	DownloadIns = &Download{
-		make(chan int, 10),
+		make(chan int, viper.GetInt("concurrent")),
 	}
 }
 
 func (this *Download) DGoroutine(wg *sync.WaitGroup, file DownloadFile) {
-	if NeedDownloadImageFile {
-		download(file)
-	}
+	download(file)
 	wg.Done()
 	<-this.Goroutine_cnt
+}
+func (this *Download) GDownload(file DownloadFile) {
+	download(file)
 }
 
 // ----------------------------------------------------------------

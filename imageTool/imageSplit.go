@@ -11,6 +11,11 @@ type Crop struct {
 	rect image.Rectangle
 }
 
+func NewCrop(rect image.Rectangle) *Crop {
+	return &Crop{
+		rect: rect,
+	}
+}
 func (p *Crop) Bounds(srcBounds image.Rectangle) (dstBounds image.Rectangle) {
 	b := srcBounds.Intersect(p.rect)
 	return b.Sub(b.Min)
