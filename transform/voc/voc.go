@@ -3,14 +3,13 @@ package voc
 import (
 	"ai-dataset-tool/log"
 	"ai-dataset-tool/sql"
+	"ai-dataset-tool/transform"
 	"ai-dataset-tool/utils"
 	"encoding/xml"
-	"github.com/spf13/viper"
 	"math"
 	"math/rand"
 	"os"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -23,16 +22,17 @@ type Annotation struct {
 	Segmented int      `xml:"segmented"`
 	Object    []Object `xml:"object"`
 }
-type source struct {
-	Database   string `xml:"database"`
-	Annotation string `xml:"annotation"`
-	Image      string `xml:"imageTool"`
-	Flickrid   int    `xml:"flickrid"`
-}
-type owner struct {
-	Flickrid string `xml:"flickrid"`
-	Name     string `xml:"name"`
-}
+
+//type source struct {
+//	Database   string `xml:"database"`
+//	Annotation string `xml:"annotation"`
+//	Image      string `xml:"imageTool"`
+//	Flickrid   int    `xml:"flickrid"`
+//}
+//type owner struct {
+//	Flickrid string `xml:"flickrid"`
+//	Name     string `xml:"name"`
+//}
 type Size struct {
 	Width  int `xml:"width"`
 	Height int `xml:"height"`
@@ -53,62 +53,35 @@ type Bndbox struct {
 }
 
 func WriteVocLabelsFile(annotationOutPath string, imageOutPath string) {
-	log.Klog.Printf("本次总图片数量：%d", len(sql.Labels))
-	var wg sync.WaitGroup
-	for _, value := range sql.Labels {
+	for _, value := range transform.PreLabelsData.LabSlice {
 		df := utils.TransformFile(value.Image_path)
-		//labelData := sql.Data{}
-		//err := json.Unmarshal([]byte(value.Data), &labelData)
-		//if err != nil {
-		//	log.Klog.Println("Label data field Unmarshal err", err)
-		//}
-		labelData, err := value.JsonToStruct()
-		if err != nil {
-			log.Klog.Println("Label data field Unmarshal err", err)
-		}
-		utils.DownloadIns.Goroutine_cnt <- 1
-		wg.Add(1)
-		go utils.DownloadIns.DGoroutine(&wg, df)
-
 		var vocLabelsTrainFile *os.File // 训练集
 		// 构建xml数据
 		vocAnnotation := Annotation{
 			Folder:   imageOutPath,
 			Filename: df.Name,
 			Size: Size{
-				labelData.ImageWidth,
-				labelData.ImageHeight,
+				value.ImageWidth,
+				value.ImageHeight,
 				3,
 			},
 			Segmented: 0,
 		}
 		var objs []Object
-		var bili float64
-		configImageWidth := viper.GetInt("alibucket.imageWidth")
-		configImageHeight := viper.GetInt("alibucket.imageHeight")
-		if (labelData.ImageWidth > configImageWidth) || (labelData.ImageHeight > configImageHeight) {
-			bili = float64(configImageWidth) / float64(labelData.ImageWidth)
-		} else {
-			bili = 1
-		}
-		for _, val := range labelData.Label {
+		for _, val := range value.Rects {
 			obj := Object{
 				utils.GetCategoryName(val.Category, &sql.Classes),
 				"Unspecified",
 				0,
 				0,
 				Bndbox{
-					utils.PxToString(math.Floor(utils.ToFloat64(val.Xmin)*bili + 0.5)),
-					utils.PxToString(math.Floor(utils.ToFloat64(val.Ymin)*bili + 0.5)),
-					utils.PxToString(math.Floor(utils.ToFloat64(val.Xmax)*bili + 0.5)),
-					utils.PxToString(math.Floor(utils.ToFloat64(val.Ymax)*bili + 0.5)),
+					utils.PxToString(val.Xmin),
+					utils.PxToString(val.Ymin),
+					utils.PxToString(val.Xmax),
+					utils.PxToString(val.Ymax),
 				},
 			}
 			objs = append(objs, obj)
-			if err != nil {
-				log.Klog.Errorln("标签文件写入失败")
-				os.Exit(1)
-			}
 		}
 		vocAnnotation.Object = objs
 		vocXml, xmlErr := xml.MarshalIndent(&vocAnnotation, "", "  ")
@@ -117,8 +90,9 @@ func WriteVocLabelsFile(annotationOutPath string, imageOutPath string) {
 		}
 		defer vocLabelsTrainFile.Close()
 		// 一个图片文件
-		if vocLabelsTrainFile, err = os.OpenFile(annotationOutPath+"/"+df.Name+".xml", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0777); err != nil {
-			log.Klog.Println("文件操作err", err)
+		var vocErr error
+		if vocLabelsTrainFile, vocErr = os.OpenFile(annotationOutPath+"/"+df.Name+".xml", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0777); vocErr != nil {
+			log.Klog.Println("文件操作err", vocErr)
 			os.Exit(1)
 		}
 		fileErr := utils.WriteFile(string(vocXml), vocLabelsTrainFile)
@@ -127,34 +101,35 @@ func WriteVocLabelsFile(annotationOutPath string, imageOutPath string) {
 			os.Exit(1)
 		}
 	}
-	wg.Wait()
 	writeVocTrainAndTestFile(annotationOutPath)
 }
 
 func writeVocTrainAndTestFile(annotationOutPath string) {
-	imageCount := utils.ToFloat64(len(sql.Labels))
+	imageCount := utils.ToFloat64(len(transform.PreLabelsData.LabSlice))
 	testCount := math.Floor(imageCount*0.2 + 0.5)
 	rand.Seed(time.Now().Unix())
-	var testSlice []sql.Lab
-	for {
-		index := rand.Intn(len(sql.Labels) - 1)
-		testSlice = append(testSlice, remove(index))
-		if len(testSlice) >= int(testCount) {
-			break
+	if imageCount > 2 {
+		var testSlice []transform.Label
+		for {
+			index := rand.Intn(len(transform.PreLabelsData.LabSlice) - 1)
+			testSlice = append(testSlice, remove(index))
+			if len(testSlice) >= int(testCount) {
+				break
+			}
 		}
+		writeTxt(&testSlice, annotationOutPath+"/test.txt")
 	}
-	writeTxt(&testSlice, annotationOutPath+"/test.txt")
-	writeTxt(&sql.Labels, annotationOutPath+"/trainval.txt")
+	writeTxt(&transform.PreLabelsData.LabSlice, annotationOutPath+"/trainval.txt")
 
 }
 
-func remove(i int) (l sql.Lab) {
-	l = sql.Labels[i]
-	sql.Labels[i] = sql.Labels[len(sql.Labels)-1]
-	sql.Labels = sql.Labels[:len(sql.Labels)-1]
+func remove(i int) (l transform.Label) {
+	l = transform.PreLabelsData.LabSlice[i]
+	transform.PreLabelsData.LabSlice[i] = transform.PreLabelsData.LabSlice[len(transform.PreLabelsData.LabSlice)-1]
+	transform.PreLabelsData.LabSlice = transform.PreLabelsData.LabSlice[:len(transform.PreLabelsData.LabSlice)-1]
 	return
 }
-func writeTxt(l *[]sql.Lab, fileName string) {
+func writeTxt(l *[]transform.Label, fileName string) {
 	var fileContext string
 	for _, v := range *l {
 		firstIndex := strings.LastIndex(v.Image_path, "/")

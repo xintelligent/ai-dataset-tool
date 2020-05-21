@@ -10,7 +10,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -71,8 +70,8 @@ type Box struct {
 
 var CocoData Coco
 
-func WriteCocoFile(annotationOutPath string, needDownloadImageFile bool) error {
-	setCoco(needDownloadImageFile)
+func WriteCocoFile(annotationOutPath string) error {
+	setCoco()
 	file, err := os.Create(annotationOutPath + "/coco.json")
 	if err != nil {
 		fmt.Println("创建文件失败:", err)
@@ -97,7 +96,7 @@ func setCategories(c *[]Category) {
 		*c = append(*c, category)
 	}
 }
-func setCoco(needDownloadImageFile bool) {
+func setCoco() {
 	CocoData.Info = Info{
 		Year:         time.Now().Year(),
 		Version:      "v1.0",
@@ -108,15 +107,12 @@ func setCoco(needDownloadImageFile bool) {
 	}
 	var images []Image
 	var annotations []Annotation
-	var wg sync.WaitGroup
 	labelData := sql.Data{}
 	for _, value := range sql.Labels {
 		err := json.Unmarshal([]byte(value.Data), &labelData)
 		if err != nil {
 			fmt.Println("Unmarshal err", err)
 		}
-		utils.DownloadIns.Goroutine_cnt <- 1
-		go utils.DownloadIns.DGoroutine(&wg, utils.TransformFile(value.Image_path))
 		setImages(&images, &value, &labelData)
 		var bili float64
 		configImageWidth := viper.GetInt("alibucket.imageWidth")
@@ -128,7 +124,6 @@ func setCoco(needDownloadImageFile bool) {
 		}
 		setAnnotation(&annotations, &labelData, value.Id, value.Id, bili)
 	}
-	wg.Wait()
 	var categories []Category
 	setCategories(&categories)
 	CocoData.Image = images

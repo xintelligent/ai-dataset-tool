@@ -31,6 +31,7 @@ type OssProgressListener struct {
 }
 
 func download(df DownloadFile) {
+	log.Klog.Println(viper.GetString("alibucket.style"))
 	derr := Bucket.GetObjectToFile(df.ObjectName, ImageOutPath+"/"+df.Name+"."+df.Suffix, oss.Process(viper.GetString("alibucket.style")), oss.Progress(&OssProgressListener{}))
 	if derr != nil {
 		handleError(derr, df.ObjectName)

@@ -6,6 +6,7 @@ import (
 	"ai-dataset-tool/transform"
 	"ai-dataset-tool/utils"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"sync"
@@ -18,11 +19,7 @@ import (
 就准备只适配我们自己的数据源
 */
 var RootCmd = &cobra.Command{
-	Use:   "killer",
-	Short: "killer root",
-	Run: func(c *cobra.Command, args []string) {
-
-	},
+	Use: "ai-dataset-tool",
 }
 var needDownloadImageFile bool
 var needSplitImage bool
@@ -45,13 +42,20 @@ func Exec() {
 		fmt.Println("查询标签数据失败")
 		os.Exit(1)
 	}
+	sql.Db.Close()
 	// 下载oss 图片文件到本地
-	preDownload()
+	utils.InitDownload()
+	defer close(utils.DownloadIns.Goroutine_cnt)
+	utils.InitOss()
+	os.MkdirAll(utils.AnnotationOutPath, 0777)
+	os.MkdirAll(utils.ImageOutPath, 0777)
+	os.MkdirAll("split", 0777)
+	prepare()
 	RootCmd.Execute()
 }
 func init() {
-	RootCmd.PersistentFlags().BoolVarP(&needDownloadImageFile, "needDownloadImageFile", "d", false, "need download imageTool file")
-	RootCmd.PersistentFlags().BoolVarP(&needSplitImage, "needDownloadImageFile", "s", false, "need download imageTool file")
+	RootCmd.PersistentFlags().BoolVarP(&needDownloadImageFile, "needDownloadImageFile", "d", false, "need download image file")
+	RootCmd.PersistentFlags().BoolVarP(&needSplitImage, "needSplitImage", "s", false, "need split image file")
 	RootCmd.PersistentFlags().StringVarP(&utils.AnnotationOutPath, "AnnotationOutPath", "a", "./data", "label file out path")
 	RootCmd.PersistentFlags().StringVarP(&utils.ImageOutPath, "imageOutPath", "i", "./images", "images file out path")
 	viper.SetConfigName("config")
@@ -67,42 +71,51 @@ func init() {
 	}
 }
 
-func preDownload() {
+func prepare() {
 	log.Klog.Printf("本次总图片数量：%d", len(sql.Labels))
 	var wg sync.WaitGroup
 	images := make(map[string]bool)
 	// 验证每一条数据
 	for _, v := range sql.Labels {
+		// 拆分文件名
 		df := utils.TransformFile(v.Image_path)
+		// json 转 struct
 		data, err := v.JsonToStruct()
 		if err != nil || len(data.Label) == 0 {
 			continue
 		}
-		if _, ok := images[df.Name]; ok {
+		// 验证图片名称重复（不带后缀）
+		if _, ok := images[df.Name]; !ok {
 			images[df.Name] = true
 		} else {
 			df.Name = utils.RandStringBytesMaskImprSrcUnsafe(16)
 		}
-		var labels []transform.Shape
+		var bili float64
+		configImageWidth := viper.GetInt("alibucket.imageWidth")
+		configImageHeight := viper.GetInt("alibucket.imageHeight")
+		if (data.ImageWidth > configImageWidth) || (data.ImageHeight > configImageHeight) {
+			bili = float64(configImageWidth) / float64(data.ImageWidth)
+		} else {
+			bili = 1
+		}
+		var rects []transform.Rect
 		for _, v := range data.Label {
-			labels = append(labels, transform.Shape{
-				utils.ToFloat64(v.Xmax),
-				utils.ToFloat64(v.Xmin),
-				utils.ToFloat64(v.Ymax),
-				utils.ToFloat64(v.Ymin),
+			rects = append(rects, transform.Rect{
+				math.Floor(utils.ToFloat64(v.Xmax)*bili + 0.5),
+				math.Floor(utils.ToFloat64(v.Xmin)*bili + 0.5),
+				math.Floor(utils.ToFloat64(v.Ymax)*bili + 0.5),
+				math.Floor(utils.ToFloat64(v.Ymin)*bili + 0.5),
 				v.Category,
 			})
 		}
-		transform.LabelsData.Push(transform.Lab{
+		transform.PreLabelsData.Push(transform.Label{
 			v.Image_path,
 			utils.ImageOutPath,
 			df.Name,
 			df.Suffix,
-			transform.Data{
-				labels,
-				data.ImageWidth,
-				data.ImageHeight,
-			},
+			int(math.Floor(utils.ToFloat64(data.ImageWidth)*bili + 0.5)),
+			int(math.Floor(utils.ToFloat64(data.ImageHeight)*bili + 0.5)),
+			rects,
 		})
 		if needDownloadImageFile || needSplitImage {
 			utils.DownloadIns.Goroutine_cnt <- 1
@@ -111,7 +124,16 @@ func preDownload() {
 		}
 	}
 	wg.Wait()
+	// 图片全部下载完毕
 	if needSplitImage {
+		transform.SlitImage(utils.ImageOutPath)
+	}
 
+	for _, v := range sql.Classes {
+		transform.PreCategoriesData = append(transform.PreCategoriesData, transform.Category{
+			v.Id,
+			v.Index,
+			v.Name,
+		})
 	}
 }
