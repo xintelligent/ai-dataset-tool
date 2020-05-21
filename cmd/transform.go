@@ -33,6 +33,6 @@ func baseOnFormat() {
 		voc.WriteVocLabelsFile(utils.AnnotationOutPath, utils.ImageOutPath)
 	case "yolo":
 		yolo.WriteYoloClassFile(utils.AnnotationOutPath)
-		yolo.WriteYoloLabelsFile(utils.AnnotationOutPath)
+		yolo.WriteYoloLabelsFile(utils.AnnotationOutPath, utils.ImageOutPath)
 	}
 }

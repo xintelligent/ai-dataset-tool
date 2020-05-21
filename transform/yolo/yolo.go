@@ -4,7 +4,10 @@ import (
 	"ai-dataset-tool/log"
 	"ai-dataset-tool/transform"
 	"ai-dataset-tool/utils"
+	"math"
+	"math/rand"
 	"os"
+	"time"
 )
 
 var labelFile *os.File
@@ -25,7 +28,7 @@ func WriteYoloClassFile(classFilePath string) {
 		log.Klog.Println("class文件写入错误:", fErr)
 	}
 }
-func WriteYoloLabelsFile(labelFilePath string) {
+func WriteYoloLabelsFile(labelFilePath string, imageOutPath string) {
 	for _, label := range transform.PreLabelsData.LabSlice {
 		var err error
 		if labelFile, err = os.OpenFile(labelFilePath+"/"+label.Name+".txt", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0777); err != nil {
@@ -46,4 +49,48 @@ func WriteYoloLabelsFile(labelFilePath string) {
 		}
 		labelFile.Close()
 	}
+	splitDir(labelFilePath, imageOutPath)
+}
+
+func splitDir(annotationOutPath string, imageOutPath string) {
+	os.MkdirAll(annotationOutPath+"/sub/", 0777)
+	os.MkdirAll(imageOutPath+"/sub/", 0777)
+	imageCount := utils.ToFloat64(len(transform.PreLabelsData.LabSlice))
+	testCount := math.Floor(imageCount*0.2 + 0.5)
+	rand.Seed(time.Now().Unix())
+	if imageCount > 2 {
+		var testSlice []transform.Label
+		for {
+			index := rand.Intn(len(transform.PreLabelsData.LabSlice) - 1)
+			testSlice = append(testSlice, remove(index))
+			// 移动下annotation文件
+			afile := transform.PreLabelsData.LabSlice[index].Name + ".txt"
+			if fileIsExisted(annotationOutPath + "/" + afile) {
+				os.Rename(annotationOutPath+"/"+afile, annotationOutPath+"/sub/"+afile)
+			}
+			// 移动下image文件
+			ifile := transform.PreLabelsData.LabSlice[index].Name + transform.PreLabelsData.LabSlice[index].Suffix
+			if fileIsExisted(imageOutPath + "/" + ifile) {
+				os.Rename(imageOutPath+"/"+ifile, imageOutPath+"/sub/"+ifile)
+
+			}
+			if len(testSlice) >= int(testCount) {
+				break
+			}
+		}
+
+	}
+}
+func remove(i int) (l transform.Label) {
+	l = transform.PreLabelsData.LabSlice[i]
+	transform.PreLabelsData.LabSlice[i] = transform.PreLabelsData.LabSlice[len(transform.PreLabelsData.LabSlice)-1]
+	transform.PreLabelsData.LabSlice = transform.PreLabelsData.LabSlice[:len(transform.PreLabelsData.LabSlice)-1]
+	return
+}
+func fileIsExisted(filename string) bool {
+	existed := true
+	if _, err := os.Stat(filename); os.IsNotExist(err) {
+		existed = false
+	}
+	return existed
 }
