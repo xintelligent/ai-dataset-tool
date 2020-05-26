@@ -85,7 +85,6 @@ func cropCell(o *image.Image, c *cellMember) {
 	dst := image.NewRGBA(crop.Bounds(r))
 	crop.Draw(dst, *o, &imageTool.Options{Parallelization: true})
 	saveImage(c.ImageName+".jpg", dst)
-	return
 }
 func saveImage(filename string, img image.Image) {
 	f, err := os.Create(viper.GetString("dataset.splitImageOutPath") + "/" + filename)
@@ -104,22 +103,37 @@ func (i *imageObject) dispatchLabel() {
 	for _, value := range i.rects {
 		rx := (value.Xmax-value.Xmin)/2 + value.Xmin
 		ry := (value.Ymax-value.Ymin)/2 + value.Ymin
+		if rx == 0 || ry == 0 {
+			continue
+		}
 		column := int(math.Ceil(rx / utils.ToFloat64(i.splitSize)))
 		row := int(math.Ceil(ry / utils.ToFloat64(i.splitSize)))
 		index := (row-1)*(i.width/i.splitSize) + column - 1
+		if index < 0 {
+			log.Klog.Println(rx, ry, column, row)
+			log.Klog.Println(i.imageName)
+			log.Klog.Println(i)
+		}
 		appendLabelToCell(
 			index,
 			Rect{
-				utils.ToFloat64(int(value.Xmax) % i.splitSize),
-				utils.ToFloat64(int(value.Xmin) % i.splitSize),
-				utils.ToFloat64(int(value.Ymax) % i.splitSize),
-				utils.ToFloat64(int(value.Ymin) % i.splitSize),
+				verifyRectValue(value.Xmax, i.splitSize),
+				verifyRectValue(value.Xmin, i.splitSize),
+				verifyRectValue(value.Ymax, i.splitSize),
+				verifyRectValue(value.Ymin, i.splitSize),
 				value.Category,
 			},
 			i)
 	}
 }
-
+func verifyRectValue(v float64, s int) float64 {
+	r := utils.ToFloat64(int(v) % s)
+	if r < 0 {
+		return 0
+	} else {
+		return r
+	}
+}
 func appendLabelToCell(index int, r Rect, i *imageObject) {
 	i.cellGroup.cellMembers[index].rects = append(i.cellGroup.cellMembers[index].rects, r)
 }
@@ -136,15 +150,21 @@ func SlitImage(imageOutPath string) {
 		imageObj.dispatchLabel()
 
 		var imageErr error
-		if imageFile, imageErr = os.OpenFile(imageOutPath+"/"+lab.Name+"."+lab.Suffix, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0777); imageErr != nil {
+		if imageFile, imageErr = os.OpenFile(imageOutPath+"/"+lab.Name+"."+lab.Suffix, os.O_RDWR|os.O_APPEND, 0777); imageErr != nil {
 			log.Klog.Println("没有能打开图片文件", imageErr)
 			os.Exit(1)
 		}
+
 		origin, _, err := image.Decode(imageFile)
 		if err != nil {
 			log.Klog.Println("没有能解码图片文件", err)
 		}
-
+		b := origin.Bounds()
+		if math.Abs(utils.ToFloat64(b.Max.X-lab.ImageWidth)) > 1 || math.Abs(utils.ToFloat64(b.Max.Y-lab.ImageHeight)) > 1 {
+			log.Klog.Println(b.Max.X, lab.ImageWidth, b.Max.Y, lab.ImageHeight)
+			log.Klog.Println("图片文件数据不正确:" + lab.Image_path + " " + lab.Name)
+			continue
+		}
 		for _, cm := range imageObj.cellMembers {
 			log.Klog.Println(cm)
 			if len(cm.rects) == 0 {

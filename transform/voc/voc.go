@@ -88,7 +88,7 @@ func WriteVocLabelsFile(annotationOutPath string, imageOutPath string) {
 		if xmlErr != nil {
 			log.Klog.Println("xml编码失败")
 		}
-		defer vocLabelsTrainFile.Close()
+
 		// 一个图片文件
 		var vocErr error
 		if vocLabelsTrainFile, vocErr = os.OpenFile(annotationOutPath+"/"+df.Name+".xml", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0777); vocErr != nil {
@@ -100,6 +100,7 @@ func WriteVocLabelsFile(annotationOutPath string, imageOutPath string) {
 			log.Klog.Errorln("标签文件写入失败")
 			os.Exit(1)
 		}
+		vocLabelsTrainFile.Close()
 	}
 	writeVocTrainAndTestFile(annotationOutPath)
 }

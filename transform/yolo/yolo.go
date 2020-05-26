@@ -21,7 +21,7 @@ func WriteYoloClassFile(classFilePath string) {
 	}
 	var content string
 	for _, c := range transform.PreCategoriesData {
-		content += c.Name
+		content += c.Name + "\n"
 	}
 	fErr := utils.WriteFile(content, classFile)
 	if fErr != nil {
@@ -55,6 +55,7 @@ func WriteYoloLabelsFile(labelFilePath string, imageOutPath string) {
 func splitDir(annotationOutPath string, imageOutPath string) {
 	os.MkdirAll(annotationOutPath+"/sub/", 0777)
 	os.MkdirAll(imageOutPath+"/sub/", 0777)
+	//os.MkdirAll("./split/sub/", 0777)
 	imageCount := utils.ToFloat64(len(transform.PreLabelsData.LabSlice))
 	testCount := math.Floor(imageCount*0.2 + 0.5)
 	rand.Seed(time.Now().Unix())
@@ -69,10 +70,16 @@ func splitDir(annotationOutPath string, imageOutPath string) {
 				os.Rename(annotationOutPath+"/"+afile, annotationOutPath+"/sub/"+afile)
 			}
 			// 移动下image文件
-			ifile := transform.PreLabelsData.LabSlice[index].Name + transform.PreLabelsData.LabSlice[index].Suffix
+			ifile := transform.PreLabelsData.LabSlice[index].Name + "." + transform.PreLabelsData.LabSlice[index].Suffix
+			log.Klog.Println(ifile)
+			//if fileIsExisted("./split/" + ifile) {
+			//	os.Rename("./split/"+ifile, "./split/sub/"+ifile)
+			//
+			//}
 			if fileIsExisted(imageOutPath + "/" + ifile) {
 				os.Rename(imageOutPath+"/"+ifile, imageOutPath+"/sub/"+ifile)
-
+			} else {
+				log.Klog.Println("没有:" + imageOutPath + "/" + ifile)
 			}
 			if len(testSlice) >= int(testCount) {
 				break
