@@ -15,7 +15,7 @@ var format string
 var transformCmd = &cobra.Command{
 	Use: "transform",
 	Run: func(cmd *cobra.Command, args []string) {
-		prepare()
+		//prepare()
 		baseOnFormat()
 	},
 }

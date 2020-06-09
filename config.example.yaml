@@ -14,8 +14,19 @@ alibucket:
   bucketName:
   style: imageTool/resize,w_1024
   imageWidth: 1024
-    imageHeight: 1024
+  imageHeight: 1024
 dataset:
   labelSql: ""
   classSql: ""
   splitImageOutPath: split
+  # 新的索引值映射关系
+  classMap:
+    - oldIndex: "1"
+      newIndex: "0"
+      oldName: lianpu-hualian-ping
+      newName: lianpu-hualian-ping
+
+    - oldIndex: "2"
+      newIndex: "1"
+      oldName: lianpu-huadan-ping
+      newName: lianpu-huadan-ping

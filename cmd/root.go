@@ -10,6 +10,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 
 	"github.com/spf13/cobra"
@@ -57,6 +58,7 @@ func Exec() {
 	RootCmd.Execute()
 }
 func init() {
+	cobra.OnInitialize(prepare)
 	RootCmd.PersistentFlags().BoolVarP(&needDownloadImageFile, "needDownloadImageFile", "d", false, "need download image file")
 	RootCmd.PersistentFlags().BoolVarP(&needSplitImage, "needSplitImage", "s", false, "need split image file")
 	RootCmd.PersistentFlags().StringVarP(&utils.AnnotationOutPath, "AnnotationOutPath", "a", "./data", "label file out path")
@@ -78,6 +80,43 @@ func prepare() {
 	log.Klog.Printf("本次总图片数量：%d", len(sql.Labels))
 	var wg sync.WaitGroup
 	images := make(map[string]bool)
+	viperClassMap := viper.Get("dataset.classMap")
+	cm := []map[string]string{}
+	// 类别映射关系 []map[string]int,转化设置的值中，索引值不能重复
+	if cm != nil {
+		switch t := viperClassMap.(type) {
+		case []interface{}:
+			for _, v := range t {
+				switch f := v.(type) {
+				case map[interface{}]interface{}:
+					wip := make(map[string]string)
+					for key, value := range f {
+						wip[string(key.(string))] = string(value.(string))
+					}
+					cm = append(cm, wip)
+				}
+			}
+		}
+	}
+	// 处理classMap
+	for _, v := range sql.Classes {
+		ca, err := rectConvertClassMap(strconv.Itoa(v.Index), &cm)
+		if err != nil {
+			transform.PreCategoriesData = append(transform.PreCategoriesData, transform.Category{
+				v.Id,
+				v.Index,
+				v.Name,
+			})
+		} else {
+			index, _ := strconv.Atoi(ca.newIndex)
+			transform.PreCategoriesData = append(transform.PreCategoriesData, transform.Category{
+				v.Id,
+				index,
+				ca.newName,
+			})
+		}
+
+	}
 	// 验证每一条数据
 	for _, v := range sql.Labels {
 		// 拆分文件名
@@ -110,7 +149,7 @@ func prepare() {
 		imageHeight := math.Floor(utils.ToFloat64(data.ImageHeight)*bili + 0.5)
 		var rects []transform.Rect
 		for _, val := range data.Label {
-			r, err := verifyRectValue(val, bili, imageWidth, imageHeight)
+			r, err := verifyRectValue(val, bili, imageWidth, imageHeight, &cm)
 			if err != nil {
 				log.Klog.Println(v.Image_path, err)
 				continue
@@ -122,13 +161,13 @@ func prepare() {
 			continue
 		}
 		transform.PreLabelsData.Push(transform.Label{
-			v.Image_path,
-			utils.ImageOutPath,
-			df.Name,
-			df.Suffix,
-			int(imageWidth),
-			int(imageHeight),
-			rects,
+			Image_path:   v.Image_path,
+			ImageOutPath: utils.ImageOutPath,
+			Name:         df.Name,
+			Suffix:       df.Suffix,
+			ImageWidth:   int(imageWidth),
+			ImageHeight:  int(imageHeight),
+			Rects:        rects,
 		})
 		if needDownloadImageFile {
 			utils.DownloadIns.Goroutine_cnt <- 1
@@ -140,18 +179,11 @@ func prepare() {
 	// 图片全部下载完毕
 	if needSplitImage {
 		transform.SlitImage(utils.ImageOutPath)
-	}
-
-	for _, v := range sql.Classes {
-		transform.PreCategoriesData = append(transform.PreCategoriesData, transform.Category{
-			v.Id,
-			v.Index,
-			v.Name,
-		})
+		utils.ImageOutPath = "./split"
 	}
 }
 
-func verifyRectValue(s sql.Shape, bili float64, imageWidth float64, imageHeight float64) (transform.Rect, error) {
+func verifyRectValue(s sql.Shape, bili float64, imageWidth float64, imageHeight float64, cm *[]map[string]string) (transform.Rect, error) {
 	xmax := math.Floor(utils.ToFloat64(s.Xmax)*bili + 0.5)
 	xmin := math.Floor(utils.ToFloat64(s.Xmin)*bili + 0.5)
 	if xmin < 0 {
@@ -162,14 +194,20 @@ func verifyRectValue(s sql.Shape, bili float64, imageWidth float64, imageHeight 
 	if ymin < 0 {
 		ymin = 0
 	}
-
+	ca, err := rectConvertClassMap(s.Category, cm)
 	t := transform.Rect{
-		xmax,
-		xmin,
-		ymax,
-		ymin,
-		s.Category,
+		Xmax: xmax,
+		Xmin: xmin,
+		Ymax: ymax,
+		Ymin: ymin,
 	}
+	if err != nil {
+		t.Category = s.Category
+	} else {
+		t.Category = ca.newIndex
+
+	}
+
 	if xmax <= xmin || ymax <= ymin {
 		return t, errors.New("最大值 小于 最小值")
 	}
@@ -180,4 +218,21 @@ func verifyRectValue(s sql.Shape, bili float64, imageWidth float64, imageHeight 
 		return t, errors.New("坐标值大于图片宽高")
 	}
 	return t, nil
+}
+
+// 将标签中的Category转为目标数值
+type category struct {
+	oldIndex string
+	newIndex string
+	oldName  string
+	newName  string
+}
+
+func rectConvertClassMap(i string, cm *[]map[string]string) (category, error) {
+	for _, v := range *cm {
+		if value, ok := v["oldIndex"]; ok && value == i {
+			return category{oldIndex: v["oldIndex"], newIndex: v["newIndex"], oldName: v["oldName"], newName: v["newName"]}, nil
+		}
+	}
+	return category{}, errors.New("no match")
 }
