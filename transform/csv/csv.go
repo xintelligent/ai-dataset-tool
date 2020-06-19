@@ -7,7 +7,6 @@ import (
 	"ai-dataset-tool/utils"
 	"fmt"
 	"os"
-	"strings"
 	"sync/atomic"
 )
 
@@ -41,10 +40,9 @@ func WriteCsvLabelsFile(labelFilePath string) {
 	var labelCount int64
 	for _, value := range transform.PreLabelsData.LabSlice {
 		// 一个图片文件
-		subIndex := strings.LastIndex(value.Image_path, "/")
 		for _, val := range value.Rects {
 			atomic.AddInt64(&labelCount, 1)
-			content := value.Image_path[subIndex+1:] + "," + utils.PxToString(val.Xmin) + "," + utils.PxToString(val.Ymin) + "," + utils.PxToString(val.Xmax) + "," + utils.PxToString(val.Ymax) + "," + utils.GetCategoryName(val.Category, &sql.Classes) + "\n"
+			content := value.Name + ".jpg," + utils.PxToString(val.Xmin) + "," + utils.PxToString(val.Ymin) + "," + utils.PxToString(val.Xmax) + "," + utils.PxToString(val.Ymax) + "," + utils.GetCategoryName(val.Category, &sql.Classes) + "\n"
 			err := utils.WriteFile(content, labelsmapFile)
 			if err != nil {
 				log.Klog.Errorln("标签文件写入失败")

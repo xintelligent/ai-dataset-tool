@@ -37,7 +37,7 @@ func WriteYoloLabelsFile(labelFilePath string, imageOutPath string) {
 		}
 		var content string
 		for _, rect := range label.Rects {
-			rw := utils.PxToString((rect.Xmax - rect.Xmin) / utils.ToFloat64(label.ImageHeight))
+			rw := utils.PxToString((rect.Xmax - rect.Xmin) / utils.ToFloat64(label.ImageWidth))
 			rh := utils.PxToString((rect.Ymax - rect.Ymin) / utils.ToFloat64(label.ImageHeight))
 			rx := utils.PxToString((rect.Xmin + (rect.Xmax-rect.Xmin)/2) / utils.ToFloat64(label.ImageWidth))
 			ry := utils.PxToString((rect.Ymin + (rect.Ymax-rect.Ymin)/2) / utils.ToFloat64(label.ImageHeight))
