@@ -192,10 +192,12 @@ func filterRectValue(s sql.Shape, bili float64, imageWidth float64, imageHeight 
 	ymax := math.Floor(utils.ToFloat64(s.Ymax)*bili + 0.5)
 	ymin := math.Floor(utils.ToFloat64(s.Ymin)*bili + 0.5)
 	if zoomRect := viper.GetInt("dataset.zoomRect"); (zoomRect != 0) && (zoomRect > 0) {
-		xmax = xmax * (utils.ToFloat64(zoomRect) * xmax / 100)
-		xmin = xmin * (utils.ToFloat64(zoomRect) * xmin / 100)
-		ymax = ymax * (utils.ToFloat64(zoomRect) * ymax / 100)
-		ymin = xmin * (utils.ToFloat64(zoomRect) * xmin / 100)
+		log.Klog.Println("缩放比例", zoomRect)
+		xmax = utils.ToFloat64(zoomRect) * xmax / 100.0
+		xmin = utils.ToFloat64(zoomRect) * xmin / 100.0
+		ymax = utils.ToFloat64(zoomRect) * ymax / 100.0
+		ymin = utils.ToFloat64(zoomRect) * xmin / 100.0
+		log.Klog.Println(xmax)
 	}
 	if ymin < 0 {
 		ymin = 0

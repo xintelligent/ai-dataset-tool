@@ -1,15 +1,11 @@
 package coco
 
 import (
-	"ai-dataset-tool/sql"
-	"ai-dataset-tool/utils"
+	"ai-dataset-tool/log"
+	"ai-dataset-tool/transform"
 	"encoding/json"
-	"fmt"
-	"github.com/spf13/viper"
-	"math"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -74,20 +70,20 @@ func WriteCocoFile(annotationOutPath string) error {
 	setCoco()
 	file, err := os.Create(annotationOutPath + "/coco.json")
 	if err != nil {
-		fmt.Println("创建文件失败:", err)
+		log.Klog.Println("创建文件失败:", err)
 		return err
 	}
 	defer file.Close()
 	jsonEncode := json.NewEncoder(file)
 	writeErr := jsonEncode.Encode(CocoData)
 	if writeErr != nil {
-		fmt.Println("json写入失败:", writeErr)
+		log.Klog.Println("json写入失败:", writeErr)
 		return err
 	}
 	return nil
 }
 func setCategories(c *[]Category) {
-	for _, v := range sql.Classes {
+	for _, v := range transform.PreCategoriesData {
 		category := Category{
 			Id:            v.Index,
 			Name:          v.Name,
@@ -107,60 +103,45 @@ func setCoco() {
 	}
 	var images []Image
 	var annotations []Annotation
-	labelData := sql.Data{}
-	for _, value := range sql.Labels {
-		err := json.Unmarshal([]byte(value.Data), &labelData)
-		if err != nil {
-			fmt.Println("Unmarshal err", err)
-		}
-		setImages(&images, &value, &labelData)
-		var bili float64
-		configImageWidth := viper.GetInt("alibucket.imageWidth")
-		configImageHeight := viper.GetInt("alibucket.imageHeight")
-		if (labelData.ImageWidth > configImageWidth) || (labelData.ImageHeight > configImageHeight) {
-			bili = float64(configImageWidth) / float64(labelData.ImageWidth)
-		} else {
-			bili = 1
-		}
-		setAnnotation(&annotations, &labelData, value.Id, value.Id, bili)
+	for key, value := range transform.PreLabelsData.LabSlice {
+		setImages(&images, &value, key)
+		setAnnotation(&annotations, &value.Rects, key)
 	}
+	log.Klog.Println(images)
 	var categories []Category
 	setCategories(&categories)
 	CocoData.Image = images
 	CocoData.Annotations = annotations
 	CocoData.Categories = categories
 }
-func setImages(i *[]Image, l *sql.Lab, ld *sql.Data) {
-	subIndex := strings.LastIndex(l.Image_path, "/")
+func setImages(i *[]Image, l *transform.Label, id int) {
 	image := Image{
-		Id:            l.Id,
-		Width:         ld.ImageWidth,
-		Height:        ld.ImageHeight,
-		File_name:     l.Image_path[subIndex+1:],
+		Id:            id,
+		Width:         l.ImageWidth,
+		Height:        l.ImageHeight,
+		File_name:     l.Name + "." + l.Suffix,
 		License:       0,
 		Flickr_url:    "",
 		Coco_url:      "",
 		Date_captured: time.Now().Format("2006-01-02 15:04:05"),
 	}
+	log.Klog.Println(l)
+	log.Klog.Println(image)
 	*i = append(*i, image)
 }
-func setAnnotation(an *[]Annotation, ld *sql.Data, id int, imageId int, bili float64) {
-	for _, v := range ld.Label {
+func setAnnotation(an *[]Annotation, rects *[]transform.Rect, id int) {
+	for k, v := range *rects {
 		cid, err := strconv.Atoi(v.Category)
 		if err != nil {
-			fmt.Println(err)
+			log.Klog.Println(err)
 		}
-		xmin := math.Floor(utils.ToFloat64(v.Xmin)*bili + 0.5)
-		ymin := math.Floor(utils.ToFloat64(v.Ymin)*bili + 0.5)
-		xmax := math.Floor(utils.ToFloat64(v.Xmax)*bili + 0.5)
-		ymax := math.Floor(utils.ToFloat64(v.Ymax)*bili + 0.5)
 		annotation := Annotation{
-			Id:           id,
-			Image_id:     imageId,
+			Id:           k,
+			Image_id:     id,
 			Category_id:  cid,
-			Segmentation: [][]float64{{xmin, ymin, xmax, ymin, xmax, ymax, xmin, ymax}},
-			Area:         (xmax - xmin) * (ymax - ymin),
-			Bbox:         [4]float64{xmin, ymin, xmax - xmin, ymax - ymin},
+			Segmentation: [][]float64{{v.Xmin, v.Ymin, v.Xmax, v.Ymin, v.Xmax, v.Ymax, v.Xmin, v.Ymax}},
+			Area:         (v.Xmax - v.Xmin) * (v.Ymax - v.Ymin),
+			Bbox:         [4]float64{v.Xmin, v.Ymin, v.Xmax - v.Xmin, v.Ymax - v.Ymin},
 			Iscrowd:      0,
 		}
 		*an = append(*an, annotation)
