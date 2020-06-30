@@ -19,6 +19,8 @@ dataset:
   labelSql: ""
   classSql: ""
   splitImageOutPath: split
+  # 标签框缩放 zoomRect/100=结果/原始大小
+  zoomRect: 100
   # 新的索引值映射关系
   classMap:
     - oldIndex: "1"

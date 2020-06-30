@@ -149,7 +149,7 @@ func prepare() {
 		imageHeight := math.Floor(utils.ToFloat64(data.ImageHeight)*bili + 0.5)
 		var rects []transform.Rect
 		for _, val := range data.Label {
-			r, err := verifyRectValue(val, bili, imageWidth, imageHeight, &cm)
+			r, err := filterRectValue(val, bili, imageWidth, imageHeight, &cm)
 			if err != nil {
 				log.Klog.Println(v.Image_path, err)
 				continue
@@ -183,7 +183,7 @@ func prepare() {
 	}
 }
 
-func verifyRectValue(s sql.Shape, bili float64, imageWidth float64, imageHeight float64, cm *[]map[string]string) (transform.Rect, error) {
+func filterRectValue(s sql.Shape, bili float64, imageWidth float64, imageHeight float64, cm *[]map[string]string) (transform.Rect, error) {
 	xmax := math.Floor(utils.ToFloat64(s.Xmax)*bili + 0.5)
 	xmin := math.Floor(utils.ToFloat64(s.Xmin)*bili + 0.5)
 	if xmin < 0 {
@@ -191,21 +191,20 @@ func verifyRectValue(s sql.Shape, bili float64, imageWidth float64, imageHeight 
 	}
 	ymax := math.Floor(utils.ToFloat64(s.Ymax)*bili + 0.5)
 	ymin := math.Floor(utils.ToFloat64(s.Ymin)*bili + 0.5)
+	if zoomRect := viper.GetInt("dataset.zoomRect"); (zoomRect != 0) && (zoomRect > 0) {
+		xmax = xmax * (utils.ToFloat64(zoomRect) * xmax / 100)
+		xmin = xmin * (utils.ToFloat64(zoomRect) * xmin / 100)
+		ymax = ymax * (utils.ToFloat64(zoomRect) * ymax / 100)
+		ymin = xmin * (utils.ToFloat64(zoomRect) * xmin / 100)
+	}
 	if ymin < 0 {
 		ymin = 0
 	}
-	ca, err := rectConvertClassMap(s.Category, cm)
 	t := transform.Rect{
 		Xmax: xmax,
 		Xmin: xmin,
 		Ymax: ymax,
 		Ymin: ymin,
-	}
-	if err != nil {
-		t.Category = s.Category
-	} else {
-		t.Category = ca.newIndex
-
 	}
 
 	if xmax <= xmin || ymax <= ymin {
@@ -216,6 +215,13 @@ func verifyRectValue(s sql.Shape, bili float64, imageWidth float64, imageHeight 
 	}
 	if xmax > imageWidth || ymax > imageHeight || xmin >= imageWidth || ymin >= imageHeight {
 		return t, errors.New("坐标值大于图片宽高")
+	}
+
+	if ca, err := rectConvertClassMap(s.Category, cm); err != nil {
+		t.Category = s.Category
+	} else {
+		t.Category = ca.newIndex
+
 	}
 	return t, nil
 }
