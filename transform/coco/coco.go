@@ -11,7 +11,7 @@ import (
 
 type Coco struct {
 	Info        Info         `json:"info"`
-	Image       []Image      `json:"imageTool"`
+	Image       []Image      `json:"images"`
 	Annotations []Annotation `json:"annotations"`
 	Categories  []Category   `json:"categories"`
 }
@@ -103,20 +103,19 @@ func setCoco() {
 	}
 	var images []Image
 	var annotations []Annotation
-	for key, value := range transform.PreLabelsData.LabSlice {
-		setImages(&images, &value, key)
-		setAnnotation(&annotations, &value.Rects, key)
+	for _, value := range transform.PreLabelsData.LabSlice {
+		setImages(&images, &value)
+		setAnnotation(&annotations, &value)
 	}
-	log.Klog.Println(images)
 	var categories []Category
 	setCategories(&categories)
 	CocoData.Image = images
 	CocoData.Annotations = annotations
 	CocoData.Categories = categories
 }
-func setImages(i *[]Image, l *transform.Label, id int) {
+func setImages(i *[]Image, l *transform.Label) {
 	image := Image{
-		Id:            id,
+		Id:            l.Id,
 		Width:         l.ImageWidth,
 		Height:        l.ImageHeight,
 		File_name:     l.Name + "." + l.Suffix,
@@ -125,19 +124,17 @@ func setImages(i *[]Image, l *transform.Label, id int) {
 		Coco_url:      "",
 		Date_captured: time.Now().Format("2006-01-02 15:04:05"),
 	}
-	log.Klog.Println(l)
-	log.Klog.Println(image)
 	*i = append(*i, image)
 }
-func setAnnotation(an *[]Annotation, rects *[]transform.Rect, id int) {
-	for k, v := range *rects {
+func setAnnotation(an *[]Annotation, l *transform.Label) {
+	for _, v := range l.Rects {
 		cid, err := strconv.Atoi(v.Category)
 		if err != nil {
 			log.Klog.Println(err)
 		}
 		annotation := Annotation{
-			Id:           k,
-			Image_id:     id,
+			Id:           v.Index,
+			Image_id:     l.Id,
 			Category_id:  cid,
 			Segmentation: [][]float64{{v.Xmin, v.Ymin, v.Xmax, v.Ymin, v.Xmax, v.Ymax, v.Xmin, v.Ymax}},
 			Area:         (v.Xmax - v.Xmin) * (v.Ymax - v.Ymin),

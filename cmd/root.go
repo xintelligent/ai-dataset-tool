@@ -7,6 +7,7 @@ import (
 	"ai-dataset-tool/utils"
 	"errors"
 	"fmt"
+	"image"
 	"math"
 	"os"
 	"path/filepath"
@@ -15,6 +16,9 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	_ "image/gif"
+	_ "image/jpeg"
+	_ "image/png"
 )
 
 /**
@@ -28,6 +32,7 @@ var RootCmd = &cobra.Command{
 }
 var needDownloadImageFile bool
 var needSplitImage bool
+var rectIndex int = 1
 
 func Exec() {
 	// 准备日志服务
@@ -161,6 +166,7 @@ func prepare() {
 			continue
 		}
 		transform.PreLabelsData.Push(transform.Label{
+			Id:           v.Id,
 			Image_path:   v.Image_path,
 			ImageOutPath: utils.ImageOutPath,
 			Name:         df.Name,
@@ -176,13 +182,45 @@ func prepare() {
 		}
 	}
 	wg.Wait()
+	checkImageFile()
 	// 图片全部下载完毕
 	if needSplitImage {
 		transform.SlitImage(utils.ImageOutPath)
 		utils.ImageOutPath = "./split"
 	}
 }
-
+func checkImageFile() {
+	var needRemove []int
+	for k, label := range transform.PreLabelsData.LabSlice {
+		f, err := os.Open(label.ImageOutPath + "/" + label.Name + "." + label.Suffix)
+		if err != nil {
+			removeImageFromPre(k)
+		}
+		imgFile, _, err := image.DecodeConfig(f)
+		if err != nil {
+			log.Klog.Println(err.Error())
+		}
+		log.Klog.Println("标签数据宽高: ", label.ImageWidth, label.ImageHeight, label.Name)
+		log.Klog.Println("图片实际宽高: ", imgFile.Width, imgFile.Height)
+		if imgFile.Width != label.ImageWidth || imgFile.Height != label.ImageHeight {
+			needRemove = append(needRemove, k)
+			log.Klog.Println("不符合实际情况的图片: ", label)
+		}
+		f.Close()
+	}
+	if len(needRemove) > 0 {
+		for _, v := range needRemove {
+			removeImageFromPre(v)
+		}
+	}
+	log.Klog.Println("校验原文件结束")
+}
+func removeImageFromPre(i int) (l transform.Label) {
+	l = transform.PreLabelsData.LabSlice[i]
+	transform.PreLabelsData.LabSlice[i] = transform.PreLabelsData.LabSlice[len(transform.PreLabelsData.LabSlice)-1]
+	transform.PreLabelsData.LabSlice = transform.PreLabelsData.LabSlice[:len(transform.PreLabelsData.LabSlice)-1]
+	return
+}
 func filterRectValue(s sql.Shape, bili float64, imageWidth float64, imageHeight float64, cm *[]map[string]string) (transform.Rect, error) {
 	xmax := math.Floor(utils.ToFloat64(s.Xmax)*bili + 0.5)
 	xmin := math.Floor(utils.ToFloat64(s.Xmin)*bili + 0.5)
@@ -191,22 +229,30 @@ func filterRectValue(s sql.Shape, bili float64, imageWidth float64, imageHeight 
 	}
 	ymax := math.Floor(utils.ToFloat64(s.Ymax)*bili + 0.5)
 	ymin := math.Floor(utils.ToFloat64(s.Ymin)*bili + 0.5)
+	// 以中心点缩放
 	if zoomRect := viper.GetInt("dataset.zoomRect"); (zoomRect != 0) && (zoomRect > 0) {
+		rectWidth := xmax - xmin
+		rectHeight := ymax - ymin
+		centerX := xmin + (rectWidth)/2
+		centerY := ymin + (rectHeight)/2
+		zoomWidth := utils.ToFloat64(zoomRect) * rectWidth / 100.0 / 2
+		zoomHeight := utils.ToFloat64(zoomRect) * rectHeight / 100.0 / 2
 		log.Klog.Println("缩放比例", zoomRect)
-		xmax = utils.ToFloat64(zoomRect) * xmax / 100.0
-		xmin = utils.ToFloat64(zoomRect) * xmin / 100.0
-		ymax = utils.ToFloat64(zoomRect) * ymax / 100.0
-		ymin = utils.ToFloat64(zoomRect) * xmin / 100.0
+		xmax = centerX + zoomWidth
+		xmin = centerX - zoomWidth
+		ymax = centerY + zoomHeight
+		ymin = centerY - zoomHeight
 		log.Klog.Println(xmax)
 	}
 	if ymin < 0 {
 		ymin = 0
 	}
 	t := transform.Rect{
-		Xmax: xmax,
-		Xmin: xmin,
-		Ymax: ymax,
-		Ymin: ymin,
+		Index: rectIndex,
+		Xmax:  xmax,
+		Xmin:  xmin,
+		Ymax:  ymax,
+		Ymin:  ymin,
 	}
 
 	if xmax <= xmin || ymax <= ymin {
@@ -225,6 +271,7 @@ func filterRectValue(s sql.Shape, bili float64, imageWidth float64, imageHeight 
 		t.Category = ca.newIndex
 
 	}
+	rectIndex++
 	return t, nil
 }
 

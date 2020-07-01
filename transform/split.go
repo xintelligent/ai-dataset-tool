@@ -12,6 +12,8 @@ import (
 )
 
 var splitLabelsData = Labels{}
+var rectIndex int = 1
+var imageIndex int = 1
 
 // 图片分割
 type cellGroup struct {
@@ -117,6 +119,7 @@ func (i *imageObject) dispatchLabel() {
 		appendLabelToCell(
 			index,
 			Rect{
+				rectIndex,
 				verifyRectValue(value.Xmax, i.splitSize),
 				verifyRectValue(value.Xmin, i.splitSize),
 				verifyRectValue(value.Ymax, i.splitSize),
@@ -124,6 +127,7 @@ func (i *imageObject) dispatchLabel() {
 				value.Category,
 			},
 			i)
+		rectIndex++
 	}
 }
 func verifyRectValue(v float64, s int) float64 {
@@ -174,14 +178,16 @@ func SlitImage(imageOutPath string) {
 			cropCell(&origin, &cm)
 
 			splitLabelsData.LabSlice = append(splitLabelsData.LabSlice, Label{
-				"",
+				imageIndex,
 				cm.ImageOutPath,
+				viper.GetString("dataset.splitImageOutPath"),
 				cm.ImageName,
 				cm.Suffix,
 				cm.ImageWidth,
 				cm.ImageHeight,
 				cm.rects,
 			})
+			imageIndex++
 		}
 	}
 	PreLabelsData = splitLabelsData

@@ -7,6 +7,7 @@ type Labels struct {
 	LabSlice []Label
 }
 type Label struct {
+	Id           int
 	Image_path   string // oss 存储路径加文件名
 	ImageOutPath string // 本地存储路径
 	Name         string // 本地文件名，不包含后缀
@@ -17,6 +18,7 @@ type Label struct {
 }
 
 type Rect struct {
+	Index    int
 	Xmax     float64
 	Xmin     float64
 	Ymax     float64
