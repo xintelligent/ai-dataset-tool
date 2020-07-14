@@ -1,20 +1,18 @@
 package sql
 
 import (
-	"ai-dataset-tool/log"
-	"fmt"
-	"github.com/jmoiron/sqlx"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore"
 	"github.com/spf13/viper"
 )
 
-var Db *sqlx.DB
+var DB *tablestore.TableStoreClient
 
 func InitSql() {
-	dsn := fmt.Sprintf("%s:%s@%s(%s:%d)/%s", viper.GetString("mysql.username"), viper.GetString("mysql.password"), viper.GetString("mysql.network"), viper.GetString("mysql.server"), viper.GetInt("mysql.port"), viper.GetString("mysql.database"))
-	DB, err := sqlx.Open("mysql", dsn+"?charset=utf8mb4")
-	if err != nil {
-		log.Klog.Printf("Open mysql failed,err:%v\n", err)
-		return
-	}
-	Db = DB
+	DB = tablestore.NewClient(viper.GetString("ali-table-store.endPoint"), viper.GetString("ali-table-store.instanceName"), viper.GetString("ali-table-store.accessKeyId"), viper.GetString("ali-table-store.accessKeySecret"))
 }
+
+//初始化``TableStoreClient``实例。
+//endPoint是表格存储服务的地址（例如'https://instance.cn-hangzhou.ots.aliyun.com:80'），必须以'https://'开头。
+//accessKeyId是访问表格存储服务的AccessKeyID，通过官方网站申请或通过管理员获取。
+//accessKeySecret是访问表格存储服务的AccessKeySecret，通过官方网站申请或通过管理员获取。
+//instanceName是要访问的实例名，通过官方网站控制台创建或通过管理员获取。

@@ -2,11 +2,7 @@ package cmd
 
 import (
 	"ai-dataset-tool/transform/coco"
-	"ai-dataset-tool/transform/csv"
-	"ai-dataset-tool/transform/voc"
-	"ai-dataset-tool/transform/yolo"
 	"ai-dataset-tool/utils"
-	"fmt"
 	"github.com/spf13/cobra"
 )
 
@@ -26,16 +22,16 @@ func init() {
 }
 func baseOnFormat() {
 	switch format {
-	case "csv":
-		csv.WriteCsvClassFile(utils.AnnotationOutPath)
-		csv.WriteCsvLabelsFile(utils.AnnotationOutPath)
+	//case "csv":
+	//	csv.WriteCsvClassFile(utils.AnnotationOutPath)
+	//	csv.WriteCsvLabelsFile(utils.AnnotationOutPath)
 	case "coco":
 		coco.WriteCocoFile(utils.AnnotationOutPath)
-	case "voc":
-		voc.WriteVocLabelsFile(utils.AnnotationOutPath, utils.ImageOutPath)
-	case "yolo":
-		fmt.Println("yolo")
-		yolo.WriteYoloClassFile(utils.AnnotationOutPath)
-		yolo.WriteYoloLabelsFile(utils.AnnotationOutPath, utils.ImageOutPath)
+		//case "voc":
+		//	voc.WriteVocLabelsFile(utils.AnnotationOutPath, utils.ImageOutPath)
+		//case "yolo":
+		//	fmt.Println("yolo")
+		//	yolo.WriteYoloClassFile(utils.AnnotationOutPath)
+		//	yolo.WriteYoloLabelsFile(utils.AnnotationOutPath, utils.ImageOutPath)
 	}
 }

@@ -1,12 +1,14 @@
 console: false
 concurrent: 10
-mysql:
-  username: "root"
-  password: "123"
-  network: tcp
-  server: 127.0.0.1
-  port: 3306
-  database: mark
+ali-table-store:
+  endPoint: "https://mark-sence-tool.cn-beijing.ots.aliyuncs.com"
+  accessKeyId: ""
+  accessKeySecret: ""
+  instanceName: "mark-sence-tool"
+  imageTableName: "project_images"
+  labelTableName: "image_labels"
+  projectTableName: "projects"
+  projectId: "37fd5efa-f438-4f20-93f5-4fdd846f5106"
 alibucket:
   endpoint: http://oss-cn-beijing.aliyuncs.com
   accessKeyId:

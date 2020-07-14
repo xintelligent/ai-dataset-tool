@@ -41,18 +41,17 @@ func Exec() {
 	sql.InitSql()
 	// 准本数据源
 	var classErr error
-	sql.Classes, classErr = sql.NewClassesFromMysql()
+	classErr = sql.NewClassesFromMysql()
 	if classErr != nil {
-		fmt.Println("标签类别查询失败")
+		log.Klog.Println("标签类别查询失败", classErr)
 		os.Exit(1)
 	}
 	var labelErr error
-	sql.Labels, labelErr = sql.NewLabelsFromMysql()
+	labelErr = sql.NewLabelsFromMysql()
 	if labelErr != nil {
-		fmt.Println("查询标签数据失败")
+		log.Klog.Println("查询标签数据失败", labelErr)
 		os.Exit(1)
 	}
-	sql.Db.Close()
 	// 下载oss 图片文件到本地
 	utils.InitDownload()
 	defer close(utils.DownloadIns.Goroutine_cnt)
@@ -60,6 +59,7 @@ func Exec() {
 	os.MkdirAll(utils.AnnotationOutPath, 0777)
 	os.MkdirAll(utils.ImageOutPath, 0777)
 	os.MkdirAll("split", 0777)
+
 	RootCmd.Execute()
 }
 func init() {
@@ -108,30 +108,26 @@ func prepare() {
 		ca, err := rectConvertClassMap(strconv.Itoa(v.Index), &cm)
 		if err != nil {
 			transform.PreCategoriesData = append(transform.PreCategoriesData, transform.Category{
-				v.Id,
 				v.Index,
 				v.Name,
 			})
 		} else {
 			index, _ := strconv.Atoi(ca.newIndex)
 			transform.PreCategoriesData = append(transform.PreCategoriesData, transform.Category{
-				v.Id,
 				index,
 				ca.newName,
 			})
 		}
 
 	}
+	// 计数,当作索引用
+	var polygonCount int
+	var imageCount int
 	// 验证每一条数据
 	for _, v := range sql.Labels {
 		// 拆分文件名
-		df := utils.TransformFile(v.Image_path)
+		df := utils.TransformFile(v.ImagePath)
 		df.Suffix = "jpg"
-		// json 转 struct
-		data, err := v.JsonToStruct()
-		if err != nil || len(data.Label) == 0 {
-			continue
-		}
 		// 验证图片名称重复（不带后缀）
 		if _, ok := images[df.Name]; !ok {
 			images[df.Name] = true
@@ -142,38 +138,51 @@ func prepare() {
 		var bili float64
 		configImageWidth := viper.GetInt("alibucket.imageWidth")
 		configImageHeight := viper.GetInt("alibucket.imageHeight")
-		if (data.ImageWidth > configImageWidth) || (data.ImageHeight > configImageHeight) {
-			bili = float64(configImageHeight) / float64(data.ImageHeight)
-			if data.ImageWidth > data.ImageHeight {
-				bili = float64(configImageWidth) / float64(data.ImageWidth)
+		info := utils.GetImageInfoFromOSS(v.ImagePath)
+		fmt.Println("阿里云响应图片尺寸:::::", info)
+		v.ImageWidth, _ = strconv.Atoi(info.ImageWidth.Value)
+		v.ImageHeight, _ = strconv.Atoi(info.ImageHeight.Value)
+		if (configImageWidth > 0 || configImageHeight > 0) && ((v.ImageWidth > configImageWidth) || (v.ImageHeight > configImageHeight)) {
+			bili = float64(configImageHeight) / float64(v.ImageHeight)
+			if v.ImageWidth > v.ImageHeight {
+				bili = float64(configImageWidth) / float64(v.ImageWidth)
 			}
 		} else {
 			bili = 1
 		}
-		imageWidth := math.Floor(utils.ToFloat64(data.ImageWidth)*bili + 0.5)
-		imageHeight := math.Floor(utils.ToFloat64(data.ImageHeight)*bili + 0.5)
-		var rects []transform.Rect
-		for _, val := range data.Label {
-			r, err := filterRectValue(val, bili, imageWidth, imageHeight, &cm)
+		imageWidth := math.Floor(utils.ToFloat64(v.ImageWidth)*bili + 0.5)
+		imageHeight := math.Floor(utils.ToFloat64(v.ImageHeight)*bili + 0.5)
+		var polygons []transform.Polygon
+		// TODO::::: 标签类型 不去考虑具体形状(将Rect当作两个点的多边形)
+		for _, val := range v.LabelPolygon {
+			err := filterRectValue(val, bili, imageWidth, imageHeight, &cm)
 			if err != nil {
-				log.Klog.Println(v.Image_path, err)
+				log.Klog.Println(v.ImagePath, err)
 				continue
 			}
-			rects = append(rects, r)
+			polygonCount++
+			polygons = append(polygons, transform.Polygon{
+				Id:        val.Id,
+				Index:     polygonCount,
+				Point:     val.Point,
+				Category:  val.Category,
+				LabelType: val.LabelType,
+			})
 		}
-		if len(rects) == 0 {
-			log.Klog.Println("图片没有任何正确的标签:" + v.Image_path)
+		if len(polygons) == 0 {
+			log.Klog.Println("图片没有任何正确的标签:" + v.ImagePath)
 			continue
 		}
+		imageCount++
 		transform.PreLabelsData.Push(transform.Label{
-			Id:           v.Id,
-			Image_path:   v.Image_path,
+			Index:        imageCount,
+			Image_path:   v.ImagePath,
 			ImageOutPath: utils.ImageOutPath,
 			Name:         df.Name,
 			Suffix:       df.Suffix,
 			ImageWidth:   int(imageWidth),
 			ImageHeight:  int(imageHeight),
-			Rects:        rects,
+			Polygons:     polygons,
 		})
 		if needDownloadImageFile {
 			utils.DownloadIns.Goroutine_cnt <- 1
@@ -182,11 +191,14 @@ func prepare() {
 		}
 	}
 	wg.Wait()
-	checkImageFile()
-	// 图片全部下载完毕
+	if needDownloadImageFile {
+		checkImageFile()
+	}
+	// 图片全部下载完毕 TODO:::
 	if needSplitImage {
-		transform.SlitImage(utils.ImageOutPath)
-		utils.ImageOutPath = "./split"
+		fmt.Println("切分功能关闭了TODO")
+		//transform.SlitImage(utils.ImageOutPath)
+		//utils.ImageOutPath = "./split"
 	}
 }
 func checkImageFile() {
@@ -221,58 +233,27 @@ func removeImageFromPre(i int) (l transform.Label) {
 	transform.PreLabelsData.LabSlice = transform.PreLabelsData.LabSlice[:len(transform.PreLabelsData.LabSlice)-1]
 	return
 }
-func filterRectValue(s sql.Shape, bili float64, imageWidth float64, imageHeight float64, cm *[]map[string]string) (transform.Rect, error) {
-	xmax := math.Floor(utils.ToFloat64(s.Xmax)*bili + 0.5)
-	xmin := math.Floor(utils.ToFloat64(s.Xmin)*bili + 0.5)
-	if xmin < 0 {
-		xmin = 0
-	}
-	ymax := math.Floor(utils.ToFloat64(s.Ymax)*bili + 0.5)
-	ymin := math.Floor(utils.ToFloat64(s.Ymin)*bili + 0.5)
-	// 以中心点缩放
-	if zoomRect := viper.GetInt("dataset.zoomRect"); (zoomRect != 0) && (zoomRect > 0) {
-		rectWidth := xmax - xmin
-		rectHeight := ymax - ymin
-		centerX := xmin + (rectWidth)/2
-		centerY := ymin + (rectHeight)/2
-		zoomWidth := utils.ToFloat64(zoomRect) * rectWidth / 100.0 / 2
-		zoomHeight := utils.ToFloat64(zoomRect) * rectHeight / 100.0 / 2
-		log.Klog.Println("缩放比例", zoomRect)
-		xmax = centerX + zoomWidth
-		xmin = centerX - zoomWidth
-		ymax = centerY + zoomHeight
-		ymin = centerY - zoomHeight
-		log.Klog.Println(xmax)
-	}
-	if ymin < 0 {
-		ymin = 0
-	}
-	t := transform.Rect{
-		Index: rectIndex,
-		Xmax:  xmax,
-		Xmin:  xmin,
-		Ymax:  ymax,
-		Ymin:  ymin,
-	}
 
-	if xmax <= xmin || ymax <= ymin {
-		return t, errors.New("最大值 小于 最小值")
-	}
-	if xmax <= 0 || ymax <= 0 {
-		return t, errors.New("max 类型坐标有0值")
-	}
-	if xmax > imageWidth || ymax > imageHeight || xmin >= imageWidth || ymin >= imageHeight {
-		return t, errors.New("坐标值大于图片宽高")
-	}
+// 发现有错误数据，log记录后直接放弃 TODO::: 缩放
+func filterRectValue(s sql.Polygon, bili float64, imageWidth float64, imageHeight float64, cm *[]map[string]string) error {
+	for _, value := range s.Point {
+		x := value[0]
+		y := value[1]
 
-	if ca, err := rectConvertClassMap(s.Category, cm); err != nil {
-		t.Category = s.Category
-	} else {
-		t.Category = ca.newIndex
+		if x <= 0 || y <= 0 {
+			return errors.New("max 类型坐标有0值")
+		}
+		if x > imageWidth || y > imageHeight {
+			fmt.Println("图片高度", imageWidth, imageHeight, x, y)
+			return errors.New("坐标值大于图片宽高")
+		}
 
+		if ca, err := rectConvertClassMap(s.Category, cm); err == nil {
+			s.Category = ca.newIndex
+		}
 	}
 	rectIndex++
-	return t, nil
+	return nil
 }
 
 // 将标签中的Category转为目标数值

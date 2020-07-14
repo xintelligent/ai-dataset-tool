@@ -42,13 +42,13 @@ type License struct {
 
 // ------- 对象识别需要
 type Annotation struct {
-	Id           int         `json:"id"`
-	Image_id     int         `json:"image_id"`
-	Category_id  int         `json:"category_id"`
-	Segmentation [][]float64 `json:"segmentation"`
-	Area         float64     `json:"area"`
-	Bbox         [4]float64  `json:"bbox"`
-	Iscrowd      int         `json:"iscrowd"`
+	Id           int        `json:"id"`
+	Image_id     int        `json:"image_id"`
+	Category_id  int        `json:"category_id"`
+	Segmentation []float64  `json:"segmentation"`
+	Area         float64    `json:"area"`
+	Bbox         [4]float64 `json:"bbox"`
+	Iscrowd      int        `json:"iscrowd"`
 }
 type Category struct {
 	Id            int    `json:"id"`
@@ -115,7 +115,7 @@ func setCoco() {
 }
 func setImages(i *[]Image, l *transform.Label) {
 	image := Image{
-		Id:            l.Id,
+		Id:            l.Index,
 		Width:         l.ImageWidth,
 		Height:        l.ImageHeight,
 		File_name:     l.Name + "." + l.Suffix,
@@ -127,20 +127,28 @@ func setImages(i *[]Image, l *transform.Label) {
 	*i = append(*i, image)
 }
 func setAnnotation(an *[]Annotation, l *transform.Label) {
-	for _, v := range l.Rects {
+	for _, v := range l.Polygons {
 		cid, err := strconv.Atoi(v.Category)
 		if err != nil {
 			log.Klog.Println(err)
 		}
+		bounds := transform.GetBound(v.Point)
 		annotation := Annotation{
 			Id:           v.Index,
-			Image_id:     l.Id,
+			Image_id:     l.Index,
 			Category_id:  cid,
-			Segmentation: [][]float64{{v.Xmin, v.Ymin, v.Xmax, v.Ymin, v.Xmax, v.Ymax, v.Xmin, v.Ymax}},
-			Area:         (v.Xmax - v.Xmin) * (v.Ymax - v.Ymin),
-			Bbox:         [4]float64{v.Xmin, v.Ymin, v.Xmax - v.Xmin, v.Ymax - v.Ymin},
+			Segmentation: dimensionalityReduction(v.Point),
+			Area:         (bounds.Xmax - bounds.Xmin) * (bounds.Ymax - bounds.Ymin),
+			Bbox:         [4]float64{bounds.Xmin, bounds.Ymin, bounds.Xmax - bounds.Xmin, bounds.Ymax - bounds.Ymin},
 			Iscrowd:      0,
 		}
 		*an = append(*an, annotation)
 	}
+}
+func dimensionalityReduction(p [][]float64) []float64 {
+	var data []float64
+	for _, v := range p {
+		data = append(data, v[0], v[1])
+	}
+	return data
 }
